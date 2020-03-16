@@ -13,7 +13,7 @@ library(glmnet)
 ```
 
 ```{r}
-day <- read.csv("F:/DEEPANSHU/WESTERNU/SUBJECTS/Stats Mod/project/Guidelines & Data/day.csv")
+day <- read.csv("day.csv")
 head(day)
 ```
 
