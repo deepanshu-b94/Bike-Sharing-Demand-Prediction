@@ -1,0 +1,740 @@
+---
+title: "project1"
+author: "Gia Xue"
+date: "2019/11/25"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exploratory Data Analysis
+
+```{r}
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(reshape2)
+library(faraway)
+library(lmtest)
+library(MASS)
+library(glmnet)
+```
+
+```{r}
+day <- read.csv("F:/DEEPANSHU/WESTERNU/SUBJECTS/Stats Mod/project/Guidelines & Data/day.csv")
+head(day)
+```
+
+## 2.1 General inspection of data
+First let's see the structure of the dataset.
+```{r}
+str(day)
+```
+This dataset contains 731 observations and 16 variables. Among them, season,yr,mnth,holiday,weekday,workingday,weathersit are categorical variables and should be factorized later.
+
+## 2.2 Data quality
+
+## 2.2.1 missing data analysis
+
+Check for missing data
+```{r}
+sum(is.na(day))
+```
+There is no missing data in the dataset.
+
+## 2.2.2 Outlier
+
+Outliers in data would distort predictions. Check if there are outliers in continuous numeric predictors (temp,hum,windspeed) using boxplot. 
+
+```{r}
+boxplot(day$temp,day$hum,day$windspeed)
+```
+
+As we can see,the variable windspeed has a considerable amount of outliers which might affect our predictions. They need to be taken care of. We removed outliers with IQR and median.
+
+```{r}
+upper = median(day$windspeed)+3*IQR(day$windspeed)/(2*0.6745)
+day <-day[!(day$windspeed>upper),]
+```
+
+After dealing with outliers in windspeed, 9 observations were removed.
+
+## 2.2.3 Turn categorical variables into factors
+For the use of exploratory analysis and modelling, some variables such as "season" and "yr" need to be transformed from int to categorical variable.
+
+```{r}
+day$dteday<-as.Date(day$dteday)
+day$season<-as.factor(day$season)
+day$yr<-as.factor(day$yr)
+day$mnth<-as.factor(day$mnth)
+day$holiday<-as.factor(day$holiday)
+day$weekday<-as.factor(day$weekday)
+day$workingday<-as.factor(day$workingday)
+day$weathersit<-as.factor(day$weathersit)
+
+str(day)
+```
+
+## 2.3 Visual analysis
+
+## 2.3.1 Distribution of numeric variables
+First let's see how our numerical variables are distributed.
+
+```{r}
+ggplot(data=day,aes(x=temp))+
+  geom_histogram(fill="lightblue")
+ggplot(data=day,aes(x=atemp))+
+  geom_histogram(fill="lightblue")
+ggplot(data=day,aes(x=hum))+
+  geom_histogram(fill="lightblue")
+ggplot(data=day,aes(x=windspeed))+
+  geom_histogram(fill="lightblue")
+ggplot(data=day,aes(x=registered))+
+  geom_histogram(fill="lightblue")
+```
+
+## 2.3.2 Distribution of categorical variables
+
+```{r}
+par(mfrow = c(3,2))
+barplot(table(day$season),main="Barplot by Season",col='steelblue')
+barplot(table(day$mnth),main="Barplot by month",col='steelblue')
+barplot(table(day$holiday),main="Barplot by holiday",col='steelblue')
+barplot(table(day$weekday),main="Barplot by weekday",col='steelblue')
+barplot(table(day$workingday),main="Barplot by workingday",col='steelblue')
+barplot(table(day$weathersit),main="Barplot by weathersit",col='steelblue')
+grid()
+```
+
+## 2.3.3 Distribution of response variable on categorical predictors
+
+```{r}
+par(mfrow = c(3,2))
+boxplot(formula = registered~season,data = day,main="Boxplot by Season",col='steelblue')
+boxplot(formula = registered~mnth,data = day,main="Boxplot by Month",col='steelblue')
+boxplot(formula = registered~holiday,data = day,main="Boxplot by Holiday",col='steelblue')
+boxplot(formula = registered~weekday,data = day,main="Boxplot by Weekday",col='steelblue')
+boxplot(formula = registered~workingday,data = day,main="Boxplot by Working Day",col='steelblue')
+boxplot(formula = registered~weathersit,data = day,main="Boxplot by Weather Situation",col='steelblue')
+grid()
+```
+
+## 2.3.4 Trends of response variable on numeric predictors
+(1)the general trend of number of registered users across time
+```{r}
+day %>% 
+  mutate(month=month(dteday),day=day(dteday),wday=wday(dteday),year=year(dteday))%>%
+  group_by(dteday)%>%
+  summarize(sum_registered=sum(registered))%>%
+  ggplot()+
+  geom_line(aes(x=dteday,y=sum_registered,group=1))
+```
+We could see that the trend of registered users is a composition of major increasing trend plus seasonal fluctuations. Number of registered users drop as winter comes and increases as summer comes every year.
+
+(2) Number of registered users based on weather
+
+```{r}
+par(mfrow = c(3,2))
+weather_registered <-day %>% dplyr::select(mnth,weathersit,registered)
+weather_df <- weather_registered %>%
+  group_by(mnth,weathersit) %>%
+  summarise(registered = sum(registered))
+ggplot(weather_df,aes(mnth,registered))+
+  labs(title="Monthly registered users based on weather")+
+  geom_line(aes(color=weathersit,group=weathersit))
+workingday_registered <- day %>% dplyr::select(mnth,workingday,registered)
+workingday_df <- workingday_registered %>%
+  group_by(mnth,workingday) %>%
+  summarise(registered=sum(registered))
+ggplot(workingday_df,aes(mnth,registered))+
+  labs(title="Monthly registered users based on workingday")+
+  geom_line(aes(color=workingday,group=workingday))
+holiday_registered <- day %>% dplyr::select(mnth,holiday,registered)
+holiday_df <- holiday_registered %>%
+  group_by(mnth,holiday) %>%
+  summarise(registered=sum(registered))
+ggplot(holiday_df,aes(mnth,registered))+
+  labs(title="Monthly registered users based on holiday")+
+  geom_line(aes(color=holiday,group=holiday))
+grid()
+```
+The plot shows that number of registered users has a lot to do with weather. People use shared bikes more on sunny days, less on little snowy days and barely use any on heavily rainy days.
+
+(3) Monthly registered users based on workingday
+
+```{r}
+workingday_registered <- day %>% dplyr::select(mnth,workingday,registered)
+workingday_df <- workingday_registered %>%
+  group_by(mnth,workingday) %>%
+  summarise(registered=sum(registered))
+
+ggplot(workingday_df,aes(mnth,registered))+
+  labs(title="Monthly registered users based on workingday")+
+  geom_line(aes(color=workingday,group=workingday))
+
+```
+The plot shows clear relationship between whether a day is a workingday and the number of registered users that shared the bike. People share bikes more if they need to go to work on that day.
+
+(4)Monthly distribution of registered users based on holiday
+
+```{r}
+holiday_registered <- day %>% dplyr::select(mnth,holiday,registered)
+holiday_df <- holiday_registered %>%
+  group_by(mnth,holiday) %>%
+  summarise(registered=sum(registered))
+
+ggplot(holiday_df,aes(mnth,registered))+
+  labs(title="Monthly registered users based on holiday")+
+  geom_line(aes(color=holiday,group=holiday))
+
+```
+People barely use any shared bikes on holidays.
+
+(5)Distribution of registered users based on season
+
+```{r}
+ggplot(aes(x=season,y=registered,fill=registered),data=day)+
+  geom_boxplot()+
+  labs(title="Distribution of registered users based on season")
+  
+```
+(6)weekday distribution of registered users
+
+```{r}
+ggplot(aes(x=weekday,y=registered),data=day)+
+  geom_line()+
+  labs(title="weekday distribution of registered users")
+```
+Number of registered users are slightly smaller on weekends and there is no significant difference between numbers of each weekday. 
+
+(7)Number of registered users based on temperature
+```{r}
+ggplot(aes(x=temp,y=registered),data=day)+
+  geom_line()+
+  labs(title="Number of registered users based on temperature")
+ggplot(aes(x=temp,y=registered),data=day)+ 
+  geom_point(alpha = 0.3, aes(color = temp)) + 
+  theme_bw()
+```
+
+The number of registered users increases with temperature. This plot gives the intuition that temperature could be a significant predictor. To justify this, we could explore this furthur in correlation analysis.
+
+(8)Number of registered users based on windspeed
+
+```{r}
+ggplot(aes(x=windspeed,y=registered),data=day)+ 
+  geom_point(alpha = 0.3, aes(color = windspeed)) + 
+  theme_bw()
+```
+
+(9)Number of registered users based on humidity
+
+```{r}
+ggplot(aes(x=hum,y=registered),data=day)+ 
+  geom_point(alpha = 0.3, aes(color = hum)) + 
+  theme_bw()
+```
+## 2.4 Correlation analysis
+
+Generate a correlation matrix for all numeric predictors and response variable,then visualize it with a heat map.
+
+
+```{r}
+cor_matrix_data <-cor(day[,c("registered","windspeed","temp","atemp","hum","windspeed","cnt")])
+melted_cor_matrix <-melt(cor_matrix_data)
+ggplot(data = melted_cor_matrix, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+theme(text = element_text(size=12),axis.text.x = element_text(angle=90, hjust=1),plot.title = element_text(hjust=0.5))+
+  ggtitle("Correlation Heatmap")+
+  labs( fill = expression("Relation"))+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1),name="Pearson\nCorrelation") +
+  geom_text(aes(Var2, Var1, label = round(value,2)), color = "black", size = 2)
+```
+
+From the heatmap we could see that atemp is highly correlated with temp,they have same correlation with response variable. So we could delete one of them, say "atemp".
+
+## 3.Model construction
+estimate,
+validate,
+transformation,
+variable selection,
+advanced models(lasso,ridge)
+
+## 3.1 Feature selection
+
+From the previous analysis we know that several variables should be dropped:
+
+-instant, dteday: because they coudln't be used as predictors (but we'll keep dteday for a while because it is used for splitting training and testing set)
+
+-casual, cnt: they represent number of users just as the response variable, so they can not be predictors as well.
+
+-atemp: because it is highly correlated with temp.
+
+-mnth: the response variable varies with mnth in a similar way that it varies with season. So we keep "season" and drop "mnth".
+
+```{r}
+day <- subset(day,select=-c(instant,casual,cnt,atemp,mnth))
+head(day)
+```
+
+## 3.2 train test split
+
+```{r}
+train <-day[1:600,]
+test <-day[600:nrow(day),]
+head(train)
+```
+
+## 3.3 Model construction
+
+To start with, we build a MLR model with all predictors,without interaction.
+
+```{r}
+lm_full<-lm(registered~.-dteday,data=train)
+summary(lm_full)
+```
+This baseline model provides adjusted R2 of 0.86
+
+
+```{r}
+lm_full<-lm(registered~.-dteday-workingday,data=train)
+summary(lm_full)
+```
+
+## 3.4 check model assumptions
+
+a MLR model have 3 assumptions:
+linearity, equal variance and normality. check if all of three holds for "lm_full" we have just constructed.
+
+(1) linearity
+```{r}
+yhat = fitted.values(lm_full)
+e = resid(lm_full)
+
+ggplot(train,aes(x=yhat,y=e))+
+  geom_point()+
+  geom_hline(aes(yintercept=mean(e)))
+  labs(title="residual plot over fitted values")
+```
+
+Linearity assumption holds.
+
+```{r}
+bptest(lm_full)
+```
+
+The p value of bptest is pretty small, whici gives clear evidence that equal variance assumption is violated.
+
+Then check for normality assumption with shapiro test and qqplot.
+
+```{r}
+ggplot(train,aes(sample=e))+
+  stat_qq()+
+  stat_qq_line()
+```
+```{r}
+shapiro.test(e)
+```
+
+Large deviation in qqplot and small p value of shapiro test give clear evidence that normality assumption is violated too.
+
+Now that 2 assumptions that our linear model: 
+$$Y_i=\beta_0+\beta_1x_i1+...+\beta_(p-1)x_(p-1)+\epsilon_i$$ 
+is based on are violated, inferences from this linear fitted model will not be valid. 
+
+To address this problem, I'll identify influential outliers and remove them, check if there is any improvement in model assumptions, then try transformations.
+
+## 3.5 Identify influential outliers
+
+A data point is influential if the deletion of the point from data will noticeably change the fitted model. A point is considered influential if it has a Cook's distance larger than 4/(number of data).
+
+```{r}
+influential_indices =e[cooks.distance(lm_full)>(4/nrow(train))]
+influential_indices
+```
+
+There are 52 influential points in the data.
+
+An outlier is a point that doesn't fit the model well. A point is considered an outlier if it has an absolute standardized residual over 2. 
+
+```{r}
+outliers = which(abs(rstandard(lm_full))>2)
+outliers
+```
+
+There are 31 points that considered outliers. Remove influential outliers from the data, use the new dataset and the same variables to construct a new model, and check for model assumptions. 
+
+```{r}
+data1<-day[-c(27,89,203,204,239,266,286,328,329,341,425,442,448,449,464,513,514,538,539,546,554,555,572),]
+lm_full_1 = lm(registered~.-dteday,data=data1)
+e1 = resid(lm_full_1)
+yhat1=fitted.values(lm_full_1)
+
+ggplot(data1,aes(x=yhat1,y=e1))+
+  geom_point()+
+  geom_hline(aes(yintercept=mean(e1)))
+  labs(title="residual plot over fitted values:lm reduced 1")
+  
+bptest(lm_full_1)
+shapiro.test(e1)
+```
+
+We could see from residual plot that the removal of influential outliers improved linearity. However, small p values from bptest and shapiro test indicates that problem still exists with equal variance assumption and normality assumption. 
+
+## 3.5 Transformation on response variable
+
+Next, I will try transform response variable on full model.
+
+```{r}
+boxcox(lm_full)
+```
+
+For transformation, choose $\lambda=0.8$
+
+```{r}
+lm_trans_full=lm((registered^(0.8)-1/0.8)~.-dteday,data=train)
+shapiro.test(resid(lm_trans_full))
+bptest(lm_trans_full)
+
+ggplot(train,aes(x=fitted.values(lm_trans_full),y=resid(lm_trans_full)))+
+  geom_point()+
+  geom_hline(aes(yintercept=mean(resid(lm_trans_full))))
+  labs(title="residual plot over fitted values")
+summary(lm_trans_full)
+```
+
+Results from bptest and shapiro test show that equal variance and normality assumptions are still violated. The transformation didn't help much in correcting the assumptions.
+
+## 3.6 Add quadratic terms
+
+Add quadratic terms for each continuous numeric predictor.
+
+```{r}
+lm_full_quadratic <-lm(registered~.-dteday-workingday+I(temp^2)+I(hum^2)+I(windspeed^2),data=train)
+summary(lm_full_quadratic)
+```
+
+adjusted R2 is 0.88, the model now fits train data better than our initial model.The quadratic term for windspeed actually has a large p value, which suggests it might be insignificant. Drop this term from the model.
+
+```{r}
+lm_full_quadratic <-lm(registered~.-dteday-workingday+I(temp^2)+I(hum^2),data=train)
+summary(lm_full_quadratic)
+```
+
+The adjusted R2 remains the same, and now all p values for predictors show significance. Next, check for model assumptions:
+
+```{r}
+bptest(lm_full_quadratic)
+shapiro.test(resid(lm_full_quadratic))
+```
+
+Model assumptions stay uncorrected.
+
+```{r}
+ggplot(train,aes(x=fitted.values(lm_full_quadratic),y=resid(lm_full_quadratic)))+
+  geom_point()+
+  geom_hline(aes(yintercept=mean(resid(lm_full_quadratic))))
+  labs(title="residual plot over fitted values")
+```
+
+## 3.7 Add cubic terms
+
+Now that quadratic terms of numeric predictors are significant, it's natural that we wonder whether we could add cubic terms to the model.
+
+```{r}
+lm_full_cubic <-lm(registered~.-dteday-workingday+I(temp^2)+I(hum^2)+I(windspeed^2)+I(temp^3)+I(hum^3)+I(windspeed^3),data=train)
+summary(lm_full_cubic)
+```
+
+The summary shows that cubic term for humidity is insignificant, let's drop it from the model.
+
+```{r}
+lm_full_cubic <-lm(registered~.-dteday-workingday+I(temp^2)+I(hum^2)+I(windspeed^2)+I(temp^3)+I(windspeed^3),data=train)
+summary(lm_full_cubic)
+```
+Now all cubic terms seem significant in predicting the response variable.Also, the adjusted r2 has increased, which means our model fit train data better now.
+
+Check again for model assumptions.
+```{r}
+ggplot(train,aes(x=fitted.values(lm_full_cubic),y=resid(lm_full_cubic)))+
+  geom_point()+
+  geom_hline(aes(yintercept=mean(resid(lm_full_cubic))))
+  labs(title="residual plot over fitted values")
+bptest(lm_full_cubic)
+shapiro.test(resid(lm_full_cubic))
+```
+
+Model assumptions still not corrected.
+
+## 3.8 Add interaction terms on full model
+
+```{r}
+lm_full_interactions<-lm(registered~.-dteday-workingday+season*temp+season*hum+season*windspeed+holiday*temp+holiday*hum+holiday*windspeed+weathersit*temp+weathersit*hum+weathersit*windspeed,data=train)
+summary(lm_full_interactions)
+```
+
+The adjusted r2 improved from base model, but we could see that there are interactive terms that doesn't seem significant. We'll deal with that with feature selection using stepwise methods.
+
+## 3.10 Feature selection
+
+## 3.10.1 Feature selection for full model
+
+(1) Stepwise AIC method
+```{r}
+fit_full_AIC <- step(lm_full, direction="both")
+fit_full_AIC$anova # display results
+```
+
+AIC shows there is nothing to be dropped
+
+(2) Stepwise BIC method
+
+```{r}
+fit_full_BIC <- step(lm_full, direction="both")
+fit_full_BIC$anova # display results
+```
+
+BIC actually gives the same result with AIC stepwise feature selection. 
+
+## 3.10.2 Feature selection for interaction model
+(1) Stepwise AIC method
+
+```{r}
+fit_interactions_AIC <- step(lm_full_interactions, direction="both")
+fit_interactions_AIC$anova # display results
+```
+
+Drop predictors based on AIC result.
+```{r}
+lm_interactions_aic<-lm(registered~.-dteday-workingday+season*temp+season*hum+weathersit*temp+weathersit*hum+weathersit*windspeed,data=train)
+summary(lm_interactions_aic)
+```
+
+
+(2) Stepwise BIC method
+
+```{r}
+fit_interactions_BIC <- step(lm_full_interactions, direction="both",k=log(nrow(train)))
+fit_interactions_BIC$anova # display results
+```
+
+Drop predictors based on BIC result.
+```{r}
+lm_interactions_bic<-lm(registered~.-dteday-workingday+season*temp,data=train)
+summary(lm_interactions_bic)
+```
+
+## 3.11 Advanced models: LASSO and Ridge
+
+
+
+(1) lasso and ridge on full model
+
+```{r}
+#prepare train test set for lasso and ridge regression
+X=model.matrix(registered~.-dteday-workingday,data=day)[,-1]
+y=day$registered
+
+y_tr_1 <- y[1:600]
+X_tr_1 <- X[1:600,]
+y_ts_1 <- y[600:nrow(day)]
+X_ts_1 <- X[600:nrow(day),]
+```
+
+```{r}
+fit_ridge = glmnet(X_tr_1, y_tr_1, alpha = 0)
+fit_ridge_cv = cv.glmnet(X_tr_1, y_tr_1, alpha = 0)
+plot(fit_ridge_cv)
+bestlam_1 = fit_ridge_cv$lambda.min
+bestlam_1
+fit_ridge_best = glmnet(X_tr_1, y_tr_1, alpha = 0, lambda = bestlam_1)
+fit_ridge_best
+
+```
+```{r}
+round(cbind(coef(lm_full),coef(fit_ridge_best)),3)
+```
+
+
+```{r}
+fit_lasso = glmnet(X_tr_1, y_tr_1, alpha = 1)
+fit_lasso_cv = cv.glmnet(X_tr_1, y_tr_1, alpha = 1)
+plot(fit_lasso_cv)
+bestlam = fit_lasso_cv$lambda.min
+bestlam
+fit_lasso_best = glmnet(X_tr_1, y_tr_1, alpha = 1, lambda = bestlam)
+fit_lasso_best
+```
+```{r}
+round(cbind(coef(lm_full),coef(fit_lasso_best)),3)
+```
+
+See LASSO didn't shrink any estimate to zero, so we couldn't drop any coefficients based on LASSO results. 
+
+(2) lasso on interaction model
+
+```{r}
+#prepare train test set for lasso and ridge regression
+X=model.matrix(registered~.-dteday+season*temp+season*hum+season*windspeed+weathersit*temp+weathersit*hum+weathersit*windspeed,data=day)[,-1]
+y=day$registered
+
+y_tr_2 <- y[1:600]
+X_tr_2 <- X[1:600,]
+y_ts_2 <- y[600:nrow(day)]
+X_ts_2 <- X[600:nrow(day),]
+```
+
+```{r}
+fit_lasso = glmnet(X_tr_2, y_tr_2, alpha = 1)
+fit_lasso_cv = cv.glmnet(X_tr_2, y_tr_2, alpha = 1)
+plot(fit_lasso_cv)
+bestlam_int = fit_lasso_cv$lambda.min
+bestlam_int
+fit_lasso_best_int = glmnet(X_tr_2, y_tr_2, alpha = 1, lambda = bestlam)
+fit_lasso_best_int
+round(cbind(coef(lm_full_interactions),coef(fit_lasso_best_int)),3)
+```
+
+Still, no predictor could be dropped based on LASSO results.
+
+## 3.12 Simpler models maybe?
+
+After building the above models, we are curious in what performance could we achieve with simpler models.So we tried predicting with only weather information.
+
+```{r}
+lm_weather_only<-lm(registered~weathersit+temp+hum+windspeed,data=train)
+summary(lm_weather_only)
+```
+The adjusted r2 is not very high, which means time information is significant in improving the results.
+
+## 4.Model Performances Test
+
+To evaluate and compare model performances, the following metrics are used:
+-RMSE, 
+-adjusted r2, 
+-k-fold cross validation MSE, 
+-mean sqaured test error. 
+-plot test data scatterplot vs. fitted line, see generally how the prediction is fitted
+
+Models generated from previous sections in comparison are:
+
+lm_full
+lm_interactions_aic
+lm_full_quadratic
+lm_full_cubic
+lm_weather_only
+
+
+Define the function that measures the performance.
+```{r}
+n=nrow(train)
+performance <-function(model)
+{
+  #RMSE
+  rmse <-sqrt(sum(resid(model)^2)/n)
+  #adjusted R2
+  adjr2<-summary(model)$adj.r.squared
+  #mean square test error
+  y_pred=predict(model,newdata=test)
+  test_error = mean((y_ts_1-y_pred)^2)
+  print(rmse)
+  print(adjr2)
+  print(test_error)
+  #fitted plot
+  test$y_pred<-y_pred
+  
+  ggplot(data=test)+ 
+  geom_point(aes(x=dteday,y=registered),alpha=0.3,color="red",names("true value")) +
+  geom_point(aes(x=dteday,y=y_pred),alpha=0.3,color="blue")+
+  geom_smooth(method = "lm",aes(x=dteday,y=y_pred),se=FALSE)+
+  theme_bw()
+}
+```
+
+```{r}
+performance(lm_full)
+```
+
+
+```{r}
+performance(lm_interactions_aic)
+```
+```{r}
+performance(lm_full_quadratic)
+```
+```{r}
+performance(lm_full_cubic)
+```
+```{r}
+performance(lm_weather_only)
+```
+
+
+## do 5 fold cross validation for each model
+
+lm_full
+lm_interactions_aic
+lm_full_quadratic
+lm_full_cubic
+lm_weather_only
+
+
+```{r}
+  set.seed(521)
+  day<-day[sample(nrow(day)),]
+  folds <- cut(seq(1,nrow(day)),breaks=5,labels=FALSE)
+  kcv_full = kcv_full_aic=kcv_full_int=kcv_int_aic=kcv_full_qua=kcv_full_cubic=kcv_weather_only=kcv_full_lasso = kcv_int_lasso=numeric(5)
+  
+  for(i in 1:5)
+  {
+    testidx<-which(folds==i,arr.ind=TRUE)
+    testData <- day[testidx, ]
+    trainData <- day[-testidx, ]
+    
+    model1 = lm(data=trainData,registered~.-dteday-workingday)#full
+    
+    model4=lm(registered~.-dteday-workingday+season*temp+season*hum+weathersit*temp+weathersit*hum+weathersit*windspeed,data=trainData)#interaction aic
+ 
+    model5=lm(registered~.-dteday-workingday+I(temp^2)+I(hum^2),data=trainData)#quadratic
+    model6=lm(registered~.-dteday-workingday+I(temp^2)+I(hum^2)+I(windspeed^2)+I(temp^3)+I(windspeed^3),data=trainData)#cubic
+    model7=lm(registered~weathersit+windspeed+hum+temp,data=trainData)#weather only
+    
+    
+    resid1 = testData$registered - predict(model1,newdata=testData)
+    resid4 = testData$registered - predict(model4,newdata=testData)
+    resid5 = testData$registered - predict(model5,newdata=testData)
+    resid6 = testData$registered - predict(model6,newdata=testData)
+    resid7 = testData$registered - predict(model7,newdata=testData)
+
+    
+    kcv_full[i]=sqrt(sum(resid1^2)/nrow(testData)) 
+    kcv_int_aic[i]=sqrt(sum(resid4^2)/nrow(testData)) 
+    kcv_full_qua[i]=sqrt(sum(resid5^2)/nrow(testData)) 
+    kcv_full_cubic[i]=sqrt(sum(resid6^2)/nrow(testData)) 
+    kcv_weather_only[i]=sqrt(sum(resid7^2)/nrow(testData)) 
+    
+  }
+      
+  mean(kcv_full)
+  mean(kcv_int_aic)
+  mean(kcv_full_qua)
+  mean(kcv_full_cubic)
+  mean(kcv_weather_only)
+
+```
+
+```{r}
+sqrt(775882)
+sqrt(835049)
+mean(test$registered)
+880/4814
+
+```
+
