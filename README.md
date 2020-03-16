@@ -11,11 +11,16 @@ Firstly, an initial feature selection based on previous correlation analysis and
 ### Model Construction
 
 The following list shows the 5 models and the predictors associated with each model whose performance was measured and compared. 
-Model name	predictors
+
+Model name          	Predictors
 lm_full <-	season, yr, holiday, weekday, weathersit, temp, hum, windspeed
+
 lmfullquadratic <-	season, yr, holiday, weekday, weathersit, temp, hum, windspeed, temp^2, hum^2
+
 lmfullcubic <-	season, yr, holiday, weekday, weathersit, temp, hum, windspeed, temp^2, hum^2, windspeed^2, temp^3, windspeed^3
+
 lmweatheronly <-	weathersit, temp, hum, windspeed
+
 lminteractionsaic <-	season, yr, holiday, weekday, weathersit, temp, hum, windspeed, season:temp, season:hum, weathersit:temp, weathersit:hum, weathersit: windspeed
 
 The best model was selected with lowest Mean Squared Error on test data.
