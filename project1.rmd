@@ -1,17 +1,3 @@
----
-title: "project1"
-author: "Gia Xue"
-date: "2019/11/25"
-output:
-  pdf_document: default
-  html_document:
-    df_print: paged
-  word_document: default
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ## Exploratory Data Analysis
 
