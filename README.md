@@ -12,7 +12,6 @@ Firstly, an initial feature selection based on previous correlation analysis and
 
 The following list shows the 5 models and the predictors associated with each model whose performance was measured and compared. 
 
-Model name          	Predictors
 lm_full <-	season, yr, holiday, weekday, weathersit, temp, hum, windspeed
 
 lmfullquadratic <-	season, yr, holiday, weekday, weathersit, temp, hum, windspeed, temp^2, hum^2
