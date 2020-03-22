@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Forecasting the futuristic demand has been crucial to many businesses. The main purpose of our project is to provide statistical analysis and methods that predict futuristic demand, specifically the number of registered users based on obtained information, in order to help stakeholders and investors make decisions. With accurate forecast, the cost can be cut down by optimizing the business operations – people management, financial management and cash flow. The uncertainty is reduced and helps us to anticipate the change in the market. Moreover, a promising forecast is compelling to investors who might be interested in putting money into a business. Hence for a business to operate efficiently, it needs some idea of what the future will look like. A forecast provides this look as a foundation upon which to plan.
+Forecasting the futuristic demand has been crucial to many businesses. The main purpose of the project is to provide statistical analysis and methods that predict futuristic demand, specifically the number of registered users based on obtained information, in order to help stakeholders and investors make decisions. With accurate forecast, the cost can be cut down by optimizing the business operations – people management, financial management and cash flow. The uncertainty is reduced and helps us to anticipate the change in the market. Moreover, a promising forecast is compelling to investors who might be interested in putting money into a business. Hence for a business to operate efficiently, it needs some idea of what the future will look like. A forecast provides this look as a foundation upon which to plan.
 
 ## Modelling
 
